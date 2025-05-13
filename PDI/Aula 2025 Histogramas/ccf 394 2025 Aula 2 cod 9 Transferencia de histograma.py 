@@ -1,0 +1,64 @@
+import cv2
+import numpy as np
+#A ideia central da transferência de histogramas é mapear os valores de intensidade da imagem-alvo com base na CDF da imagem de referência.
+#Para isso, cada valor de intensidade da imagem-alvo é modificado de modo que o valor mapeado tenha a mesma probabilidade acumulada que o da imagem de referência.
+#Exemplo:
+#Se na imagem-alvo o pixel com intensidade 150 tem uma probabilidade acumulada de 0,6, encontra-se o valor na imagem de referência que também tem CDF = 0,6 e mapeia-se o valor correspondente.
+def escreverImagem(msg,img, y,x):
+  posicao = (y, x)  # Posição do texto na imagem
+  fonte = cv2.FONT_HERSHEY_SIMPLEX
+  escala_fonte = 0.7  # Tamanho do texto
+  cor = (0, 255, 0)  # Cor do texto em BGR (verde)
+  espessura = 1  # Espessura da linha do texto
+
+  # Adicionar texto à imagem
+  cv2.putText(img, msg, posicao, fonte, escala_fonte, cor, espessura, cv2.LINE_AA)
+  return img
+
+# recebe a imagem e devolve a função de probabilidade acumulada
+def calcular_histograma(img):
+    hist, _ = np.histogram(img.flatten(), bins=256, range=[0, 256])
+    hist_normalizado = hist / hist.sum()
+    cdf = hist_normalizado.cumsum()  # Função de distribuição cumulativa
+    print(cdf)
+    return cdf
+# realiza a trasnformação do histograma da imagem alvo.
+#Para isso, cada valor de intensidade da imagem-alvo é modificado de modo
+#que o valor mapeado tenha a mesma probabilidade acumulada que o da imagem
+#de referência.
+
+def transferencia_histograma(img_alvo, img_referencia):
+    cdf_alvo = calcular_histograma(img_alvo)
+    cdf_ref = calcular_histograma(img_referencia)
+    
+    # Criar o mapeamento entre os pixels das duas CDFs
+    mapeamento = np.zeros(256)
+    for i in range(256):
+        valor_mapeado = np.abs(cdf_alvo[i] - cdf_ref).argmin()  # Encontrar melhor correspondência
+        mapeamento[i] = valor_mapeado
+    
+    # Aplicar o mapeamento
+    img_resultante = cv2.LUT(img_alvo, mapeamento.astype(np.uint8))
+    return img_resultante
+
+# Carregar imagens em escala de cinza
+img_alvo = cv2.imread("wiki.png", 0)
+h,w = img_alvo.shape
+img_referencia = cv2.imread("menina.png", 0)
+img_referencia = cv2.resize(img_referencia, (w, h))
+
+
+
+# Aplicar a transferência de histograma
+img_transformada = transferencia_histograma(img_alvo, img_referencia)
+
+# Mostrar a imagem transformada
+imagens= np.hstack((img_referencia,img_alvo,img_transformada))
+imagens = escreverImagem("Imagem Original",imagens, (10), (10))
+imagens = escreverImagem("Imagem Alvo",imagens, (10+w), (10))
+imagens = escreverImagem("Imagem Modificada",imagens, (10+2*w), (10))
+
+cv2.imshow("Imagens Utilizadas", imagens)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
